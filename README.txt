@@ -1,2 +1,2 @@
 
-![Llama RAG](./Files/NN_wav.webp)
+![Text-to-speech](./Files/NN_wav.jpg)
