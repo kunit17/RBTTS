@@ -1,3 +1,6 @@
 Data
 HiFi_GAN
 __pycache__
+word_counts.txt
+step.txttest_mel_files.npy
+tokenizer.txt
