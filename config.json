@@ -1,5 +1,6 @@
 {
     "sr": 22050,
     "n_fft": 2048,
-    "hop_length": 512
+    "hop_length": 512,
+    "n_mels": 128
 }
