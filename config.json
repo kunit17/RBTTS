@@ -1,7 +1,31 @@
 {
-    "sr": 22050,
-    "n_fft": 1024,
-    "hop_length": 512,
-    "n_mels": 128
-    
+    "audio_params": {
+        "sr": 22050,
+        "n_fft": 1024,
+        "hop_length": 512,
+        "n_mels": 128
+    },
+
+    "data_paths": {
+        "srt_file_path": "./Data/SRT/timestamps.txt",
+        "whole_audio_path": "./Data/her.wav",
+        "raw_audio": "./data/raw_audio/",
+        "processed_audio": "./data/processed_audio/",
+        "mel_specs": "./data/mel_specs/",
+        "training_samples": "./Data/Training_Samples"
+    },
+    "model_params": {
+        "max_context" : "1"
+        
+        
+        
+    },
+
+    "train_params": {
+        "batch_size": 32,
+        "learning_rate": 0.001,
+        "epochs": 100,
+        "block_size" : 41,
+        "vocab_size" : 1393
+    }
 }
