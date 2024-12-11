@@ -54,7 +54,7 @@ Logarithmic scaling is essential because human hearing perceives sound intensity
 
 
 # Vocoder
-After we perform calculations on each sample, we would like to have a way to reassmble the numbers back into audio waves. However, it is not as simple as just reversing the math equations we applied to the initial numbers. One issue is that when the audio wave was initially converted into tensors, information is lost during this process (specifically when projecting the magnitude spectrogram onto a Mel scale - [Step 4](### Step 4: Mel Spectrogram))
+After we perform calculations on each sample, we would like to have a way to reassmble the numbers back into audio waves. However, it is not as simple as just reversing the math equations we applied to the initial numbers. One issue is that when the audio wave was initially converted into tensors, information is lost during this process (specifically when projecting the magnitude spectrogram onto a Mel scale - [Step 4](#step-4-mel-spectrogram))
 Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](no_vocoder_output.wav)
 
 
