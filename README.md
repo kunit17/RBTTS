@@ -2,6 +2,10 @@
 
 Embarking on my second project, albeit one that could prove to be too challenging, as it delves into uncharted territory for me and demands skills I’m still mastering. My goal is to produce a natural-sounding, Text-To-Speech model using the Transformer architecture. Learning by coding directly (compared to online courses) has accelerated my knowledge base, however, so at the minimum I expect to gain a lot of insight into Transformers, in general.
 
+# Model Architecture
+
+This a classic transformer with encoder-decoder components and cross-attention. The encoder takes in input text, while the decoder takes in mel spectrograms, which represent the audio. The model will be trained with [teacher forcing](#teacher-forcing) with scheduled sampling. The input text will be broken into [phonemes](#phonemes) using the G2P library. 
+
 # Steps
 
 ## Pre-processing:
@@ -57,6 +61,9 @@ Logarithmic scaling is essential because human hearing perceives sound intensity
 After we perform calculations on each sample, we would like to have a way to reassmble the numbers back into audio waves. However, it is not as simple as just reversing the math equations we applied to the initial numbers. One issue is that when the audio wave was initially converted into tensors, information is lost during this process (specifically when projecting the magnitude spectrogram onto a Mel scale - [Step 4](#step-4-mel-spectrogram))
 Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](no_vocoder_output.wav)
 
+# Teacher Forcing
+
+# Phonemes
 
 ## Files explained
 

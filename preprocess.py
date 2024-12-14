@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import os
 import torch.nn.functional as F
-
+import G2P
 
 n_fft, hop_length, sr = utils.get_audio_params()
 
@@ -47,21 +47,19 @@ for key, value in data_dict.items():
         '<SPACE>' if token.isspace() else token # convert spaces into <SPACE>
         for token in re.findall(r'\b\w+\'?\w*|[.,!?]|\s', value['Text']) #convert text into list with words, <SPACE>, and .,!?
     ]
-    vocab += value['Text']
     value['Timestamp'] = [utils.t2ms(split) for split in value['Timestamp'].split('-->')]
 
-print(len(data_dict['359']['Text']))
+
 # Assuming data_dict is your dictionary
 max_text_key = max(data_dict, key=lambda k: len(data_dict[k]['Text']))
 max_text = data_dict[max_text_key]['Text']
 
-print(f"Key with max Text: {max_text_key}. Length in tokens: {len(max_text)} tokens: {max_text}")
+print(f"Key with max Text: {max_text_key}. Length in tokens: {len(max_text)} tokens: ")
 
 #get each unique value of the dictionary
 vocab_sorted = sorted(set(vocab))
 vocab_sorted.insert(0,'<PAD>')
-print(len(vocab_sorted))
-print(len(data_dict))
+
 # with open('vocab.json', 'w') as json_file:
 #     json.dump(vocab_sorted, json_file)
 
@@ -105,8 +103,16 @@ print(f"Size of the largest tensor: {largest_tensor_size}")
 
 max_frames = 302
 
-# Pad using -80 dB for silence
-for key, mel in y.items():
-    pad_amount = max_frames - mel.size(1)  # Calculate padding for time dimension
-    y[key] = F.pad(mel, (0, pad_amount), value=-80)  # Update in place
+# Define min and max dB values
+min_db = -80
+max_db = 0
 
+# Pad and normalize the `y` values
+for key, mel in y.items():
+    # Padding to max_frames
+    pad_amount = max_frames - mel.size(1)  # Calculate padding for time dimension
+    y[key] = F.pad(mel, (0, pad_amount), value=min_db)  # Pad using -80 dB for silence
+
+    # Normalize to [-1, 1]
+    y[key] = 2 * ((y[key] - min_db) / (max_db - min_db)) - 1
+    y[key] = torch.tensor(y[key], dtype=torch.float32, device='cuda')

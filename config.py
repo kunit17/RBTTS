@@ -28,4 +28,4 @@ except json.JSONDecodeError:
 DATA_PATHS = CONFIG.get('data_paths', {})
 
 # Debug print
-print("Loaded CONFIG:", CONFIG)
+

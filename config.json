@@ -3,7 +3,8 @@
         "sr": 22050,
         "n_fft": 1024,
         "hop_length": 512,
-        "n_mels": 128
+        "n_mels": 128,
+        "max_ts" : 302
     },
 
     "data_paths": {
@@ -14,18 +15,17 @@
         "mel_specs": "./data/mel_specs/",
         "training_samples": "./Data/Training_Samples"
     },
-    "model_params": {
-        "max_context" : "1"
-        
-        
-        
-    },
 
     "train_params": {
-        "batch_size": 32,
+        "batch_size": 2,
         "learning_rate": 0.001,
         "epochs": 100,
         "block_size" : 41,
-        "vocab_size" : 1393
+        "vocab_size" : 1393,
+        "d_model": 512,
+        "n_heads": 8,
+        "dropout_rate": 0.1,
+        "head_size": 64
+
     }
 }
