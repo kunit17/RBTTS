@@ -4,15 +4,15 @@ import os
 # Get the current script directory
 current_dir = os.path.dirname(__file__)
 
-# Load vocabulary from JSON file
-vocab_path = os.path.join(current_dir, 'vocab.json')
+# Load characters from JSON file
+char_path = os.path.join(current_dir, 'chars.json')
 try:
-    with open(vocab_path, 'r') as json_file:
-        vocab = json.load(json_file)
+    with open(char_path, 'r') as json_file:
+        chars = json.load(json_file)
 except FileNotFoundError:
-    raise FileNotFoundError(f"Could not find 'vocab.json' at {vocab_path}")
+    raise FileNotFoundError(f"Could not find 'vocab.json' at {char_path}")
 except json.JSONDecodeError:
-    raise ValueError(f"Invalid JSON in 'vocab.json' at {vocab_path}")
+    raise ValueError(f"Invalid JSON in 'vocab.json' at {char_path}")
 
 # Load parameters from JSON file
 config_path = os.path.join(current_dir, 'config.json')

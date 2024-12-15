@@ -70,3 +70,16 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 1) config.json -> contain the model's hyperparameters
 2) txtpreprocessing -> takes in sample text followed by cleaning, tokenizing, and encoding for the model's inputs (x)
 3) voicepreprocessing -> takes in sample sound files (wavs), does maths on them to convert them into tensors for the model's targets (y)
+
+# In progress
+1) Add masking for decoder inputs
+2) Ensure masking properly applied to attention blocks
+3) Ensure mel spec predictions incorporate masking for the loss computations
+4) Change attention blocks to handle relative positional encodings
+5) Adjust training loop for batch sizing
+
+# Challenges and Considerations
+
+1) The model is not explicitly told the duration of each character pronounced, which can affect the speed of the voice at the end
+2) The model is not explicitly told the phonetic pronounciations of words - the model will need to learn the associations itself
+3) The use of absolute vs relative positional encodings to handle speech generation that is longer than the training data

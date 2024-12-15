@@ -3,7 +3,7 @@ HiFi_GAN
 __pycache__
 word_counts.txt
 step.txt
-test_mel_files.npy
 tokenizer.txt
 Archive
 Research
+test.py

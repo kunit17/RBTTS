@@ -156,7 +156,7 @@ class Transformer(nn.Module):
     
     def __init__ (self):
         super().__init__()
-        self.token_embedding_table = nn.Embedding(vocab_size, d_model)
+        self.token_embedding_table = nn.Embedding(char_size, d_model)
         self.position_embedding_table = nn.Embedding(block_size, d_model)
         # self.mel_token_embedding = nn.Embedding(n_mels, d_model)  # Assuming  mel indices
         # self.mel_position_embedding = nn.Embedding(max_ts, d_model)  # Context length for mel spectrogram        

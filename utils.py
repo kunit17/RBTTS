@@ -19,12 +19,12 @@ def get_train_params():
     learning_rate = CONFIG['train_params']['learning_rate']
     epochs = CONFIG['train_params']['epochs']
     block_size = CONFIG['train_params']['block_size']
-    vocab_size = CONFIG['train_params']['vocab_size']
+    char_size = CONFIG['train_params']['char_size']
     d_model = CONFIG['train_params']['d_model']
     n_heads = CONFIG['train_params']['n_heads']
     dropout_rate = CONFIG['train_params']['dropout_rate']
     head_size = CONFIG['train_params']['head_size']
-    return batch_size, learning_rate, epochs, block_size, vocab_size, d_model, n_heads, dropout_rate, head_size
+    return batch_size, learning_rate, epochs, block_size, char_size, d_model, n_heads, dropout_rate, head_size
 
 def get_audio_params():
     n_fft = CONFIG['audio_params']['n_fft']
@@ -89,14 +89,40 @@ def export_audio_segments(whole_audio_path, data_dict, output_directory="./Data/
         print(f"Exported: {output_file}")
 
 class Tokenizer:
-    def __init__(self, vocab, pad_token="<PAD>"):
-        self.pad_token = pad_token
-        self.vocab = vocab
-        self.word_to_idx = {word: i for i, word in enumerate(vocab)}
-        self.idx_to_word = {i: word for i, word in enumerate(vocab)}
+    def __init__(self, chars):
+        self.pad_token = '<PAD>'
+        self.unk_token = '<UNK>'
+        self.eos_token = '<EOS>'
+        self.chars = chars
+        self.word_to_idx = {word: i for i, word in enumerate(chars)}
+        self.idx_to_word = {i: word for i, word in enumerate(chars)}
+
+    def split_into_chars(self, text):
+        # Split text into individual characters with <SPACE> between words
+        result = []
+        special_tokens = ['<SPACE>', '!', ',', '.', '?']
+        for word in text:
+            if word in special_tokens:
+                result.append(word)
+            else:
+                for char in word:
+                    result.append(char)  # Add each character individually
+        return result
 
     def encode(self, text, max_text_length, device='cpu'):
-        encoded_sentence = [self.word_to_idx[word] for word in text]
+
+        encoded_sentence = []
+        for word in text:
+            print(word)
+            if word in self.word_to_idx:
+                encoded_sentence.append(self.word_to_idx[word])  # Map known words directly
+            else:
+                # Split unknown words into characters
+                encoded_sentence += [self.word_to_idx.get(char, self.word_to_idx[self.unk_token]) for char in word]
+
+        # Append EOS token
+        encoded_sentence.append(self.word_to_idx[self.eos_token])
+        print(encoded_sentence)
         # If the sentence is shorter than max_text_length, pad it
         padding_needed = max_text_length - len(encoded_sentence)
         encoded_sentence = encoded_sentence[:max_text_length] + [self.word_to_idx[self.pad_token]] * padding_needed

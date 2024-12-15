@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import os
 import torch.nn.functional as F
-import G2P
+
 
 n_fft, hop_length, sr = utils.get_audio_params()
 
@@ -31,7 +31,7 @@ data_dict = {match[0]: {"Timestamp": match[1], "Text": match[2]} for match in ma
 
 vocab = []
 
-#cleaning transcription by moving values from SRT file
+#cleaning transcription and leaving the text with only alphanumeric characters, lowercase, and special characters allowed in the vocab
 for key, value in data_dict.items():
     value['Text'] = (
         value['Text']
@@ -49,27 +49,20 @@ for key, value in data_dict.items():
     ]
     value['Timestamp'] = [utils.t2ms(split) for split in value['Timestamp'].split('-->')]
 
-
-# Assuming data_dict is your dictionary
 max_text_key = max(data_dict, key=lambda k: len(data_dict[k]['Text']))
 max_text = data_dict[max_text_key]['Text']
 
-print(f"Key with max Text: {max_text_key}. Length in tokens: {len(max_text)} tokens: ")
-
-#get each unique value of the dictionary
-vocab_sorted = sorted(set(vocab))
-vocab_sorted.insert(0,'<PAD>')
+print(f"Key with max Text: {max_text_key}. Length in tokens: {len(max_text)} tokens: {max_text} ")
 
 # with open('vocab.json', 'w') as json_file:
 #     json.dump(vocab_sorted, json_file)
 
-print(data_dict[max_text_key]['Timestamp'])
 
 # Directory containing .wav files
 input_directory = utils.get_audio_samples()
 y = {}
 
-# Iterate through all .wav files in the directory
+# Iterate through all .wav files in the directory - wav names should correspond to text input names (all in numbers)
 for file_name in os.listdir(input_directory):
     if file_name.endswith(".wav"):  # Process only .wav files
         file_path = os.path.join(input_directory, file_name)
@@ -99,20 +92,16 @@ for key, tensor in y.items():
         largest_tensor_key = key
 
 print(f"Largest tensor is associated with key: {largest_tensor_key}")
-print(f"Size of the largest tensor: {largest_tensor_size}")
 
 max_frames = 302
 
 # Define min and max dB values
 min_db = -80
 max_db = 0
-
+mel_pad = -2
 # Pad and normalize the `y` values
 for key, mel in y.items():
-    # Padding to max_frames
-    pad_amount = max_frames - mel.size(1)  # Calculate padding for time dimension
-    y[key] = F.pad(mel, (0, pad_amount), value=min_db)  # Pad using -80 dB for silence
-
-    # Normalize to [-1, 1]
-    y[key] = 2 * ((y[key] - min_db) / (max_db - min_db)) - 1
-    y[key] = torch.tensor(y[key], dtype=torch.float32, device='cuda')
+    mel = 2 * ((mel - min_db) / (max_db - min_db)) - 1 # Normalize to [-1, 1]
+    pad_amount = max_frames - mel.size(1)  # Calculate and add padding after norm so distribution not affected
+    mel = F.pad(mel, (0, pad_amount), value=mel_pad)  # Pad using -80 dB for silence
+    y[key] = mel.to(dtype=torch.float32, device='cuda')
