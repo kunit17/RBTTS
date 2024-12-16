@@ -13,14 +13,15 @@
         "raw_audio": "./data/raw_audio/",
         "processed_audio": "./data/processed_audio/",
         "mel_specs": "./data/mel_specs/",
-        "training_samples": "./Data/Training_Samples"
+        "training_samples": "./Data/Training_Samples",
+        "training_data": "./Data/TrainingData"
     },
 
     "train_params": {
-        "batch_size": 2,
+        "batch_size": 8,
         "learning_rate": 0.001,
         "epochs": 100,
-        "block_size" : 200,
+        "block_size" : 8,
         "char_size" : 46,
         "d_model": 512,
         "n_heads": 8,

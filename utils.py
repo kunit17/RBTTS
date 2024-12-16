@@ -35,6 +35,9 @@ def get_audio_params():
 def get_audio_samples():
     return config.DATA_PATHS.get('training_samples', None)
 
+def get_training_data():
+    return config.DATA_PATHS.get('training_data', None)
+
 def get_srt():
     return config.DATA_PATHS.get('srt_file_path', None)
 
@@ -109,7 +112,7 @@ class Tokenizer:
                     result.append(char)  # Add each character individually
         return result
 
-    def encode(self, text, max_text_length, device='cpu'):
+    def encode(self, text):
 
         encoded_sentence = []
         for word in text:
@@ -122,15 +125,8 @@ class Tokenizer:
 
         # Append EOS token
         encoded_sentence.append(self.word_to_idx[self.eos_token])
-        print(encoded_sentence)
-        # If the sentence is shorter than max_text_length, pad it
-        padding_needed = max_text_length - len(encoded_sentence)
-        encoded_sentence = encoded_sentence[:max_text_length] + [self.word_to_idx[self.pad_token]] * padding_needed
-        # Convert to tensor
-        encoded_sentence = torch.tensor(encoded_sentence, dtype=torch.long, device=device)
-        # Create mask: 1 for real tokens, 0 for padding tokens
-        mask = (encoded_sentence != self.word_to_idx[self.pad_token]).to(dtype=torch.bool, device=device)
+        encoded_sentence = torch.tensor(encoded_sentence, dtype=torch.long)
+        return encoded_sentence
 
-        return encoded_sentence, mask
 
 

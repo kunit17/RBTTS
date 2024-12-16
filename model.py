@@ -2,13 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-
-
-
-
 class FeedFoward(nn.Module):
 
-    def __init__(self, d_model):
+    def __init__(self, d_model, dropout_rate):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(d_model, 4 * d_model), # expand 4x more neurons to give model more freedom to learn and expressiveness. (demonstrated by GPT)
@@ -23,9 +19,9 @@ class FeedFoward(nn.Module):
 class EncoderLayer(nn.Module):
     def __init__(self, d_model, n_heads, head_size, dropout_rate):
         super().__init__()
-        self.self_attn = MultiHeadAttention(n_heads, head_size)
-        self.cross_attn = MultiHeadAttention(n_heads, head_size)  # Adding cross-attention
-        self.ffwd = FeedFoward(d_model)
+        self.self_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
+        self.cross_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)  # Adding cross-attention
+        self.ffwd = FeedFoward(d_model, dropout_rate)
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
 
@@ -51,9 +47,9 @@ class Encoder(nn.Module):
 class DecoderLayer(nn.Module):
     def __init__(self, d_model, n_heads, head_size, dropout_rate):
         super().__init__()
-        self.self_attn = MultiHeadAttention(n_heads, head_size)
-        self.cross_attn = MultiHeadAttention(n_heads, head_size)
-        self.ffwd = FeedFoward(d_model)
+        self.self_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
+        self.cross_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
+        self.ffwd = FeedFoward(d_model, dropout_rate)
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
         self.ln3 = nn.LayerNorm(d_model)
@@ -80,7 +76,7 @@ class Decoder(nn.Module):
         return x
     
 class MultiHeadAttention(nn.Module):
-    def __init__(self, n_heads, head_size):
+    def __init__(self, n_heads, head_size, dropout_rate):
         super().__init__()
         self.n_heads = n_heads
         self.head_size = head_size
@@ -154,7 +150,7 @@ class MultiHeadAttention(nn.Module):
     
 class Transformer(nn.Module):
     
-    def __init__ (self):
+    def __init__ (self, block_size, char_size, d_model, n_heads, dropout_rate, head_size, n_layers, n_mels, device):
         super().__init__()
         self.token_embedding_table = nn.Embedding(char_size, d_model)
         self.position_embedding_table = nn.Embedding(block_size, d_model)
@@ -167,7 +163,7 @@ class Transformer(nn.Module):
         self.ln_head = nn.Linear(d_model, n_mels)  # Linear layer to project back to mel spectrogram size
         # self.ln_head2 = nn.Linear(d_model, n_mels)
 
-    def forward(self, src_idx, mask, targets, pred):
+    def forward(self, src_idx, mask, targets, pred, device):
         B, T = src_idx.shape
         #idx and target are both (B,T) tensors
         tok_embed = self.token_embedding_table(src_idx) #B,T,C

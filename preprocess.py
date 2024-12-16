@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import os
 import torch.nn.functional as F
-
+import json
 
 n_fft, hop_length, sr = utils.get_audio_params()
 
@@ -28,6 +28,10 @@ pattern = r'(\d{3}|\d{4})\s+(\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}
 matches = re.findall(pattern, input_file, re.DOTALL)
 
 data_dict = {match[0]: {"Timestamp": match[1], "Text": match[2]} for match in matches}
+
+# Save data_dict to a JSON file
+with open("data_dict.json", "w") as f:
+    json.dump(data_dict, f)
 
 vocab = []
 
@@ -96,12 +100,28 @@ print(f"Largest tensor is associated with key: {largest_tensor_key}")
 max_frames = 302
 
 # Define min and max dB values
-min_db = -80
+min_db = -100
 max_db = 0
-mel_pad = -2
+mel_pad = -100
 # Pad and normalize the `y` values
 for key, mel in y.items():
-    mel = 2 * ((mel - min_db) / (max_db - min_db)) - 1 # Normalize to [-1, 1]
+    # mel = 2 * ((mel - min_db) / (max_db - min_db)) - 1 # excluding normalization for now
     pad_amount = max_frames - mel.size(1)  # Calculate and add padding after norm so distribution not affected
-    mel = F.pad(mel, (0, pad_amount), value=mel_pad)  # Pad using -80 dB for silence
-    y[key] = mel.to(dtype=torch.float32, device='cuda')
+    mel = F.pad(mel, (0, pad_amount), value=mel_pad)  # Pad using -100 dB for silence
+    mel = mel.permute(1,0) # change shape to ts, n_mels
+    y[key] = mel.to(dtype=torch.float32)
+
+from utils import Tokenizer 
+from config import chars
+tokenizer = Tokenizer(chars)
+
+
+# Tokenize and save text inputs
+for key, value in data_dict.items():
+    src_idx = tokenizer.encode(value['Text'])
+    torch.save(src_idx, f"./Data/TrainingData/{key}_src_idx.pt")
+
+# Generate and save mel spectrograms
+for key, mel in y.items():
+    torch.save(mel, f"./Data/TrainingData/{key}_mel.pt")
+
