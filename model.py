@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torchtune.modules import RotaryPositionalEmbeddings
 
-class FeedFoward(nn.Module):
+class FeedForward(nn.Module):
 
     def __init__(self, d_model, dropout_rate):
         super().__init__()
@@ -20,14 +21,13 @@ class EncoderLayer(nn.Module):
     def __init__(self, d_model, n_heads, head_size, dropout_rate):
         super().__init__()
         self.self_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
-        self.cross_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)  # Adding cross-attention
-        self.ffwd = FeedFoward(d_model, dropout_rate)
+        self.ffwd = FeedForward(d_model, dropout_rate)
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
 
-    def forward(self, x, mask):
+    def forward(self, x, encoder_mask):
         # Self-attention followed by add & norm
-        x = x + self.self_attn(self.ln1(x), mask=mask)
+        x = x + self.self_attn(self.ln1(x), mask=encoder_mask)
         # Feedforward followed by add & norm
         x = x + self.ffwd(self.ln2(x))
         return x
@@ -39,9 +39,9 @@ class Encoder(nn.Module):
             EncoderLayer(d_model, n_heads, head_size, dropout_rate) for _ in range(n_layers)
         ])
 
-    def forward(self, x, mask):
+    def forward(self, x, encoder_mask):
         for layer in self.layers:
-            x = layer(x, mask=mask)
+            x = layer(x, encoder_mask=encoder_mask)
         return x
 
 class DecoderLayer(nn.Module):
@@ -49,17 +49,17 @@ class DecoderLayer(nn.Module):
         super().__init__()
         self.self_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
         self.cross_attn = MultiHeadAttention(n_heads, head_size, dropout_rate)
-        self.ffwd = FeedFoward(d_model, dropout_rate)
+        self.ffwd = FeedForward(d_model, dropout_rate)
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
         self.ln3 = nn.LayerNorm(d_model)
 
-    def forward(self, x, context):
-        # Self-attention followed by add & norm
-        x = x + self.self_attn(self.ln1(x))
+    def forward(self, x, context, decoder_mask=None, encoder_mask=None):
+        # Self-attention 
+        x = x + self.self_attn(self.ln1(x), context=None, mask=decoder_mask) # (B, timesteps, D_model) 
         # Cross-attention with encoder output as context
-        x = x + self.cross_attn(self.ln2(x), context)
-        # Feedforward followed by add & norm
+        x = x + self.cross_attn(self.ln2(x), context=context, mask=encoder_mask) # (B, timesteps, D_model) context = (B, T, d_model)
+        # Feedforward 
         x = x + self.ffwd(self.ln3(x))
         return x
 
@@ -70,43 +70,44 @@ class Decoder(nn.Module):
             DecoderLayer(d_model, n_heads, head_size, dropout_rate) for _ in range(n_layers)
         ])
 
-    def forward(self, x, context):
+    def forward(self, x, context, decoder_mask=None, encoder_mask=None):
         for layer in self.layers:
-            x = layer(x, context)
+            x = layer(x, context, decoder_mask, encoder_mask) # x is (B, timesteps, D_model) context is ((B, S, d_model))
         return x
     
 class MultiHeadAttention(nn.Module):
-    def __init__(self, n_heads, head_size, dropout_rate):
+    def __init__(self, d_model, n_heads, dropout_rate, max_seq_len=4096):
         super().__init__()
         self.n_heads = n_heads
-        self.head_size = head_size
-        self.d_model = n_heads * head_size
+        self.head_size = d_model // n_heads
+        self.d_model = d_model
+
         # Linear layers for query, key, and value
-        self.query = nn.Linear(self.d_model, self.d_model, bias=False)
-        self.key = nn.Linear(self.d_model, self.d_model, bias=False)
-        self.value = nn.Linear(self.d_model, self.d_model, bias=False)
+        self.query = nn.Linear(d_model, d_model, bias=False)
+        self.key = nn.Linear(d_model, d_model, bias=False)
+        self.value = nn.Linear(d_model, d_model, bias=False)
+
         # Output projection
-        self.proj = nn.Linear(self.d_model, self.d_model)
+        self.proj = nn.Linear(d_model, d_model)
         self.dropout = nn.Dropout(dropout_rate)
 
-    def forward(self, x, context=None, mask=None):
+        # Rotary positional embeddings
+        self.rotary_pos_emb = RotaryPositionalEmbeddings(dim=self.head_size, max_seq_len=max_seq_len)
+
+    def forward(self, x, context=None, mask=None, input_pos=None):
         """
         Args:
             x: Tensor of shape (B, T, d_model) for the query input.
             context: Tensor of shape (B, S, d_model) for the key-value input (optional).
                 If None, performs self-attention.
+            mask: Tensor of shape (B, T, S), masking for attention (optional).
+            input_pos: Tensor of shape (T,) indicating the position of each token (optional).
         Returns:
             Tensor of shape (B, T, d_model) after applying multi-head attention.
         """
-        # Ensure input x has a batch dimension
-        if x.dim() == 2:  # If input is (T, d_model)
-            x = x.unsqueeze(0)  # Add batch dimension -> (1, T, d_model)
-
-        if context is not None and context.dim() == 2:  # If context is (S, d_model)
-            context = context.unsqueeze(0)  # Add batch dimension -> (1, S, d_model)
-
         B, T, _ = x.shape
         context = x if context is None else context
+        S = context.shape[1]
 
         # Compute query, key, value
         q = self.query(x)  # (B, T, d_model)
@@ -115,29 +116,22 @@ class MultiHeadAttention(nn.Module):
 
         # Split into multiple heads and reshape
         q = q.view(B, T, self.n_heads, self.head_size).transpose(1, 2)  # (B, n_heads, T, head_size)
-        k = k.view(B, -1, self.n_heads, self.head_size).transpose(1, 2)  # (B, n_heads, S, head_size)
-        v = v.view(B, -1, self.n_heads, self.head_size).transpose(1, 2)  # (B, n_heads, S, head_size)
+        k = k.view(B, S, self.n_heads, self.head_size).transpose(1, 2)  # (B, n_heads, S, head_size)
+        v = v.view(B, S, self.n_heads, self.head_size).transpose(1, 2)  # (B, n_heads, S, head_size)
+
+        # Apply rotary positional embeddings to query and key
+        q = self.rotary_pos_emb(q, input_pos=input_pos)
+        k = self.rotary_pos_emb(k, input_pos=input_pos)
 
         # Compute attention scores
         scores = (q @ k.transpose(-2, -1)) * (self.head_size ** -0.5)  # (B, n_heads, T, S)
 
+        # Apply mask if provided
         if mask is not None:
-            # Adjust mask dimensions and apply
-            mask = mask.unsqueeze(0).unsqueeze(1).unsqueeze(2)
-            ask = mask.expand(x.shape[0], 1, 1, x.shape[1])  # Match batch size and sequence length
             scores = scores.masked_fill(mask == 0, float('-inf'))
-        # Compute attention weights
-        # scores = (q @ k.transpose(-2, -1)) * (self.head_size ** -0.5)  # (B, n_heads, T, S)
-        # print(f"x shape: {x.shape}")  # Should be [B, T, d_model]
-        # if mask is not None:
-        #     # Adjust mask dimensions to [B, 1, 1, T] for broadcasting
-        #     print(f"mask shape: {mask.shape}")  # Should be [B, 1, 1, T]
-        #     mask = mask.unsqueeze(0).unsqueeze(1).unsqueeze(2)
-        #     mask = mask.expand(x.shape[0], 1, 1, x.shape[1])  # Match batch size and sequence length
-        #     print(f"mask shape: {mask.shape}")  # Should be [B, 1, 1, T]
-        
 
-        weights = F.softmax(scores, dim=-1)  # Normalize scores
+        # Normalize scores and apply dropout
+        weights = F.softmax(scores, dim=-1)
         weights = self.dropout(weights)
 
         # Compute the attention output
@@ -147,47 +141,36 @@ class MultiHeadAttention(nn.Module):
         # Apply final linear projection
         out = self.dropout(self.proj(attention_output))
         return out
+
     
 class Transformer(nn.Module):
     
-    def __init__ (self, block_size, char_size, d_model, n_heads, dropout_rate, head_size, n_layers, n_mels, device):
+    def __init__ (self, block_size, char_size, d_model, n_heads, dropout_rate, head_size, n_layers, n_mels):
         super().__init__()
         self.token_embedding_table = nn.Embedding(char_size, d_model)
-        self.position_embedding_table = nn.Embedding(block_size, d_model)
-        # self.mel_token_embedding = nn.Embedding(n_mels, d_model)  # Assuming  mel indices
-        # self.mel_position_embedding = nn.Embedding(max_ts, d_model)  # Context length for mel spectrogram        
+        self.position_embedding_table = nn.Embedding(block_size, d_model)      
         self.encoder = Encoder(n_layers, d_model, n_heads, head_size, dropout_rate)
         self.decoder = Decoder(n_layers, d_model, n_heads, head_size, dropout_rate)
         self.trg_proj = nn.Linear(n_mels, d_model)
         self.ln_f = nn.LayerNorm(d_model) # Final layer norm before the head
         self.ln_head = nn.Linear(d_model, n_mels)  # Linear layer to project back to mel spectrogram size
-        # self.ln_head2 = nn.Linear(d_model, n_mels)
 
-    def forward(self, src_idx, mask, targets, pred, device):
-        B, T = src_idx.shape
-        #idx and target are both (B,T) tensors
-        tok_embed = self.token_embedding_table(src_idx) #B,T,C
-        pos_embed = self.position_embedding_table(torch.arange(T, device=device)) #T,C
-        x = tok_embed + pos_embed # B,T,C
-        encoder_output = self.encoder(x, mask)
-
-        # Embedding and positional encoding for target (decoder input)
-        B_tgt, T_tgt = pred.shape
-        # tgt_tok_embed = self.token_embedding_table(targets)
-        # tgt_pos_embed = self.position_embedding_table(torch.arange(T_tgt, device=targets.device))
-        # tgt = tgt_tok_embed + tgt_pos_embed
-        pred = self.trg_proj(pred)
-        decoder_output = self.decoder(pred, encoder_output)
+    def forward(self, src_idx, encoder_mask, decoder_input, decoder_mask):
+        B, T = src_idx.shape # (8 , max_input_from_batch)
+        print(f'src shape is {B,T}')
+        tok_embed = self.token_embedding_table(src_idx) #B, T, d_model
+        # Positional embedding (fetch only the first T positions)
+        pos_embed = self.position_embedding_table.weight[:T]  # Shape: (T, d_model)
+        pos_embed = pos_embed.unsqueeze(0).repeat(B, 1, 1)  # Shape: (B, T, d_model)
+        x = tok_embed + pos_embed # B,T,d_model
+        encoder_output = self.encoder(x, encoder_mask) #(B, T, d_model)
+        pred = self.trg_proj(decoder_input) # (B , timesteps, d_model)
+        decoder_output = self.decoder(pred, encoder_output, decoder_mask, encoder_mask)
         mel_output = self.ln_head(self.ln_f(decoder_output))
-
-        targets = targets.unsqueeze(0)  # Shape: [1, 302, 128]
         
-        print(mel_output.shape)
-        if targets is None:
-            loss = None
-        else:
-            loss = torch.nn.functional.l1_loss(mel_output, targets, size_average=None, reduce=None, reduction='mean')
-        return mel_output, loss
+        return mel_output
+
+
 
 
 
