@@ -72,9 +72,10 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 3) voicepreprocessing -> takes in sample sound files (wavs), does maths on them to convert them into tensors for the model's targets (y)
 
 # In progress
-2) Ensure masking properly applied to attention blocks
+
 3) Ensure mel spec predictions incorporate masking for the loss computations
-4) Change attention blocks to handle relative positional encodings
+
+
 
 # Challenges and Considerations
 
@@ -83,3 +84,5 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 3) The use of absolute vs relative positional encodings to handle speech generation that is longer than the training data
 4) Deciding whether or not to normalize mel specs (currently keeping it between -80 and 0 DB)
 5) Deciding whether to add EOD token for mel spec decoder
+6) Adjust Rope parameters
+
