@@ -28,7 +28,6 @@ class EncoderLayer(nn.Module):
     def forward(self, x, encoder_mask):
         # Self-attention followed by add & norm
         x = x + self.self_attn(self.ln1(x), mask=encoder_mask)
-        print(f'x in encoder is {x.shape}')
         # Feedforward followed by add & norm
         x = x + self.ffwd(self.ln2(x))
         return x
@@ -42,9 +41,7 @@ class Encoder(nn.Module):
 
     def forward(self, x, encoder_mask):
         for layer in self.layers:
-            print(f"encoder mask in forward of encoder is {encoder_mask.shape}")
             x = layer(x, encoder_mask=encoder_mask)
-            print(f'x in encoder is {x.shape}')
         return x
 
 class DecoderLayer(nn.Module):
@@ -60,7 +57,6 @@ class DecoderLayer(nn.Module):
     def forward(self, x, context, decoder_mask=None, encoder_mask=None):
         # Self-attention 
         x = x + self.self_attn(self.ln1(x), context=None, mask=decoder_mask) # (B, timesteps, D_model) 
-        print(f'x in decoder is {x.shape}')
         # Cross-attention with encoder output as context
         x = x + self.cross_attn(self.ln2(x), context=context, mask=encoder_mask) # (B, timesteps, D_model) context = (B, T, d_model)
         # Feedforward 
@@ -77,7 +73,6 @@ class Decoder(nn.Module):
     def forward(self, x, context, decoder_mask=None, encoder_mask=None):
         for layer in self.layers:
             x = layer(x, context, decoder_mask=decoder_mask, encoder_mask=encoder_mask) # x is (B, timesteps, D_model) context is ((B, S, d_model))
-            print(f'x in decoder is {x.shape}, decoder mask is {decoder_mask.shape}, encoder mask is {encoder_mask.shape}')
         return x
     
 class MultiHeadAttention(nn.Module):
@@ -99,7 +94,6 @@ class MultiHeadAttention(nn.Module):
         B, T, _ = x.size()
         context = x if context is None else context
         S = context.shape[1]
-        print('x shape is ' , x.shape)
         q = self.q_proj(x)  # (B, T, d_model)
         k = self.k_proj(context)  # (B, S, d_model)
         v = self.v_proj(context)  # (B, S, d_model)
@@ -112,11 +106,8 @@ class MultiHeadAttention(nn.Module):
         q = q.transpose(1, 2)  # (B, n_heads, T, head_size)
         k = k.transpose(1, 2)  # (B, n_heads, S, head_size)
         v = v.view(B, S, self.n_heads, self.head_size).transpose(1,2) # (B, n_heads, S, head_size)
-        print(mask.shape)
-        mask = mask.unsqueeze(1).unsqueeze(3).expand(-1,self.n_heads, -1, T) # B,n_heads,T,T
-        print(f'mask in attention is {mask[0,0,-5:-1,-5:-1]}, {mask.shape}')
+        mask = mask.unsqueeze(1).unsqueeze(2) # (B,1,1,S)
         attention_output = F.scaled_dot_product_attention(q, k, v, attn_mask=mask, is_causal=False) # Flash attention; no dropout
-        print(f'attention is: {attention_output.shape}')
         attention_output = attention_output.transpose(1, 2).contiguous().view(B, T, self.d_model)  # (B, T, d_model)
         # Apply final linear projection
         out = self.dropout(self.proj(attention_output))
@@ -137,13 +128,11 @@ class Transformer(nn.Module):
 
     def forward(self, src_idx, encoder_mask, decoder_input, decoder_mask, batch_targets):
         B, T = src_idx.shape # (8 , max_input_from_batch)
-        print(f'src shape is {B,T}')
         tok_embed = self.token_embedding_table(src_idx) #B, T, d_model
         # Positional embedding (fetch only the first T positions)
         pos_embed = self.position_embedding_table.weight[:T]  # Shape: (T, d_model)
         pos_embed = pos_embed.unsqueeze(0).repeat(B, 1, 1)  # Shape: (B, T, d_model)
         x = tok_embed + pos_embed # B,T,d_model
-        print(f'after embedding, before encoder: {x.shape}, encoder mask is {encoder_mask.shape}, decoder is {decoder_mask.shape}')
         encoder_output = self.encoder(x, encoder_mask) #(B, T, d_model)
         pred = self.trg_proj(decoder_input) # (B , timesteps, d_model)
         decoder_output = self.decoder(pred, encoder_output, decoder_mask, encoder_mask)

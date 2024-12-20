@@ -4,7 +4,7 @@
         "n_fft": 1024,
         "hop_length": 512,
         "n_mels": 128,
-        "max_ts" : 512
+        "max_ts" : 302
     },
 
     "data_paths": {
@@ -18,10 +18,10 @@
     },
 
     "train_params": {
-        "batch_size": 8,
+        "batch_size": 128,
         "learning_rate": 0.001,
         "epochs": 100,
-        "block_size" : 1024,
+        "block_size" : 128,
         "char_size" : 64,
         "d_model": 512,
         "n_heads": 8,

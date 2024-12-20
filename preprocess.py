@@ -1,4 +1,3 @@
-
 import re
 import utils
 import librosa
@@ -100,7 +99,7 @@ print(f"Largest tensor is associated with key: {largest_tensor_key}")
 max_frames = 302
 
 # Define min and max dB values
-min_db = -100
+
 max_db = 0
 mel_pad = -100
 # Pad and normalize the `y` values

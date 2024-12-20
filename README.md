@@ -1,9 +1,12 @@
-# RBTTS
+# RBTTS - an implementation of E2TTS (https://arxiv.org/abs/2406.18009)
 
 Embarking on my second project, albeit one that could prove to be too challenging, as it delves into uncharted territory for me and demands skills I’m still mastering. My goal is to produce a natural-sounding, Text-To-Speech model using the Transformer architecture. Learning by coding directly (compared to online courses) has accelerated my knowledge base, however, so at the minimum I expect to gain a lot of insight into Transformers, in general.
 
-# Model Architecture
+# Model Architecture - Update to Conditional Flow-Based Model
 
+After completing the creation of an encoder-decoder transformer, I will be implementing a flow-matching mel-spec generator.
+
+### Earlier iteration of the project
 This a classic transformer with encoder-decoder components and cross-attention. The encoder takes in input text, while the decoder takes in mel spectrograms, which represent the audio. The model will be trained with [teacher forcing](#teacher-forcing) with scheduled sampling. The input text will be broken into [phonemes](#phonemes) using the G2P library. This will be compared with E2 TTS flow-sampling for optimal results.
 
 # Steps
@@ -73,7 +76,8 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 
 # In progress
 
-3) Ensure mel spec predictions incorporate masking for the loss computations
+1) Add mask generator to mask input X0 -> 0.7 - 1.0
+2) input into model should be x0 - random gaussian noise
 
 
 
@@ -86,3 +90,14 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 5) Deciding whether to add EOD token for mel spec decoder
 6) Adjust Rope parameters
 
+
+
+https://colab.research.google.com/github/drscotthawley/blog/blob/main/extra/FlowModels_colab.ipynb#scrollTo=VAdp65wMqMiL
+
+https://drscotthawley.github.io/blog/posts/FlowModels.html
+
+https://diffusionflow.github.io/
+
+https://implicit-layers-tutorial.org/?utm_source=chatgpt.com
+
+https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/DL2/Dynamical_systems/dynamical_systems_neural_odes.html?utm_source=chatgpt.com
