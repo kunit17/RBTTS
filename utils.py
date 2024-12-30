@@ -10,7 +10,9 @@ from pydub import AudioSegment
 import os
 import torch
 
-
+def get_sample_stats(): # add code to determine mean and standard deviation of mel_specs
+    mean = None
+    std = None
 
 def get_train_params():
     if 'train_params' not in CONFIG:

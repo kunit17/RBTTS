@@ -5,7 +5,7 @@ from utils import Tokenizer
 import utils
 from config import chars
 import random
-from model2 import Transformer
+from model import Transformer
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 import json

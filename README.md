@@ -16,6 +16,7 @@ This a classic transformer with encoder-decoder components and cross-attention. 
 2) Create a tokenizer and encoder that uses padding as the input text I will be training on is variable in length. The choice of tokenizer is very important; I will begin with words, but will eventually use phonemes.
 3) Express audio (wav) files as tensors using the Mel Scale
 4) Ensure the tensors produced are correctly padded in such a way that the padding does not affect loss calculations
+5) Calculate the mean and standard deviation of my starting data
 
 ## Model Coding:
 1) TBC
@@ -74,12 +75,38 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 2) txtpreprocessing -> takes in sample text followed by cleaning, tokenizing, and encoding for the model's inputs (x)
 3) voicepreprocessing -> takes in sample sound files (wavs), does maths on them to convert them into tensors for the model's targets (y)
 
-# In progress
 
-1) Add mask generator to mask input X0 -> 0.7 - 1.0
-2) input into model should be x0 - random gaussian noise
+# Flow-matched models
+
+1) The goal is find how to get from a starting distribution (P0) to the target distribution (P1)
+2) When you subtract P1 - P0, you are getting the straight-line path (displacement vector) required to move from P0 to P1
+3) Train a neural network to predict the velocity field (drift) by assuming a straight line is needed to get P0 to P1. This allows the model to predict the vector field at all points t(0,1)
+4) This helps the neural network learn how to smoothly transition the source distribution into the target distribution by modeling the flow field across the entire space, rather than just matching the endpoints.
+5) The loss function, loss_fn(drift, line_directions), enforces this by penalizing the neural network if its predicted velocity (drift) deviates from the constant line_directions.
+## In Summary:
+
+The neural network is learning a velocity field for transforming the source distribution into the target. By training on interpolated samples at various tt, it ensures that the velocity predicted for each point matches the constant straight-line displacement vector, regardless of tt. This constraint teaches the network to approximate the linear transformation path while building capacity for more nuanced flows if needed.
+
+Effectively, the neural network is a learned, more complex, and data-driven version of f(x,t)f(x,t), predicting how the points flow in the transformation process.
+
+Key Idea:
+
+    A differential equation like dxdt=f(x,t)dtdx​=f(x,t) describes how a point xx changes over time (tt).
+    First-order methods assume the change (ΔxΔx) over a small step is approximately f(x,t)⋅Δtf(x,t)⋅Δt, where f(x,t)f(x,t) is the derivative or velocity.
 
 
+### More Points Where Needed (via Time Warping)
+
+You'll notice that trajectories are sharply curved in the middle, but are straight near the start and end. Just as you'd slow down when driving around a sharp turn, we should take smaller integration steps in these curved regions for accuracy.
+
+
+One handy S-shaped time-warping function is this polynomial that lets us vary the concentration of points[^2]:
+
+$$ f(t) =  4(1-s)t^3 + 6(s-1) t^2 + (3-2s)t, \ \ \ \ \ \  t\in[0,1], \ \ \ s\in[0,3/2] $$
+
+[^2]: Note: my $f(t)$ is a close approximation to the "mode function" Eq. 20 in <a href="https://arxiv.org/abs/2403.03206">Esser et al</a>, with their $s$ being about (1.75 - $s_{\rm mine}$), and with $t\rightarrow 1-t$.  My blue line is right underneath their purple line in the Desmos graph below -- I didn't plan that, just similar minds at work!  Both our curves can do the Karras et al cosine schedule, shown in green in the the Desmos figure.
+
+Train a reflowed model
 
 # Challenges and Considerations
 
@@ -90,7 +117,9 @@ Example of what it sounds like without using a vocoder: [no_vocoder_output.wav](
 5) Deciding whether to add EOD token for mel spec decoder
 6) Adjust Rope parameters
 
+# Things to study up on:
 
+1) First-order numerical integration
 
 https://colab.research.google.com/github/drscotthawley/blog/blob/main/extra/FlowModels_colab.ipynb#scrollTo=VAdp65wMqMiL
 
