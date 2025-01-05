@@ -9,6 +9,11 @@ After completing the creation of an encoder-decoder transformer, I will be imple
 ### Earlier iteration of the project
 This a classic transformer with encoder-decoder components and cross-attention. The encoder takes in input text, while the decoder takes in mel spectrograms, which represent the audio. The model will be trained with [teacher forcing](#teacher-forcing) with scheduled sampling. The input text will be broken into [phonemes](#phonemes) using the G2P library. This will be compared with E2 TTS flow-sampling for optimal results.
 
+# Under Active Development
+
+## Just completed: adding "FILL" tokens to text input so that they align with audio input according to E2TTS (https://arxiv.org/abs/2406.18009)
+## Next step: come up with methodology to combine text and audio as per E2TTS
+
 # Steps
 
 ## Pre-processing:
@@ -116,6 +121,12 @@ Train a reflowed model
 4) Deciding whether or not to normalize mel specs (currently keeping it between -80 and 0 DB)
 5) Deciding whether to add EOD token for mel spec decoder
 6) Adjust Rope parameters
+
+# Final debugging steps
+
+1) Ensure only one voice by reviewing audio and removing unique voice samples
+2) ensure text has same length (S) as audio targets; ensure special fillers added correctly to achieve this
+3) Standardize mel specs by first determining training set mean and standard deviation and then applying it
 
 # Things to study up on:
 

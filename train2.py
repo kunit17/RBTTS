@@ -5,7 +5,7 @@ from utils import Tokenizer
 import utils
 from config import chars
 import random
-from model import Transformer
+from model2 import Transformer
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 import json
@@ -26,6 +26,7 @@ n_layers = 5
 n_mels = 128
 max_timesteps = 302
 data_path = utils.get_training_data()
+velocity_consistency_delta = 1e-5
 
 # Define custom dataset class
 class TTSDataSet(Dataset):
@@ -40,8 +41,8 @@ class TTSDataSet(Dataset):
 
     def __getitem__(self, idx):
         key = self.keys[idx]
-        src = torch.load(f"{self.data_path}/{key}_src_idx.pt", weights_only=True)
-        tgt = torch.load(f"{self.data_path}/{key}_mel.pt", weights_only=True)
+        src = torch.load(f"{self.data_path}/{key}_src_idx.pt", weights_only=True) #text
+        tgt = torch.load(f"{self.data_path}/{key}_mel.pt", weights_only=True) #audio
         src = torch.nn.functional.pad(src, (0, self.block_size - src.size(0)), value=0)
         tgt = torch.nn.functional.pad(tgt, (0, 0, 0, self.max_timesteps - tgt.size(0)), value=-100)
         return src, tgt
@@ -52,8 +53,8 @@ def collate_fn(batch):
     src_padded = torch.stack(src_batch)
     tgt_padded = torch.stack(tgt_batch) 
     src_mask = (src_padded != 0)  # True where not padded
-    tgt_mask = (tgt_padded != -100).any(dim=-1)
-    return src_padded, tgt_padded, src_mask, tgt_mask
+    audio_mask = (tgt_padded != -100).any(dim=-1) #
+    return src_padded, tgt_padded, src_mask, audio_mask
 
 # Initialize model, tokenizer, and optimizer
 model = Transformer(block_size, char_size, d_model, n_heads, dropout_rate, n_layers, n_mels) 
@@ -72,20 +73,25 @@ torch.set_float32_matmul_precision('high')
 output_dir = "/home/kunit17/Her/Data/TrainingOutput"
 
 # Training loop
-for epoch in range(epochs):
-
+for epoch in range(epochs):    
     epoch_loss = 0.0
     saved = False  # Ensure only one mel_output is saved per epoch
-    for batch_src_idx, batch_targets, encoder_mask, decoder_mask in dataloader:
+    for batch_src_idx, batch_targets, audio_mask, txt_mask in dataloader:
         t0 = time.time()
         batch_src_idx = batch_src_idx.to(device, non_blocking=True)
-        batch_targets = batch_targets.to(device, non_blocking=True)
-        encoder_mask = encoder_mask.to(device, non_blocking=True)
-        decoder_mask = decoder_mask.to(device, non_blocking=True)        
-        decoder_input = batch_targets.clone() # (ts, n_mels) # Create a copy of the targets for the decoder input   
+        x1 = batch_targets.to(device, non_blocking=True)  #target distribution
+        audio_mask = audio_mask.to(device, non_blocking=True)
+        txt_mask = txt_mask.to(device, non_blocking=True)
+        x0 = torch.randn_like(x1) #Gaussian noise
+        times = torch.rand(batch_size, device=device).view(batch_size,1,1) #(B,1,1)
+        t = times * (1. - velocity_consistency_delta)
+        xt = (1. - t) * x0 + t * x1 #interpolated training sample
+        flow = x1 - x0
+        cond = torch.where(audio_mask.unsqueeze(-1), x1, torch.zeros_like(x1))
+
         # Backpropagation and optimization
         optimizer.zero_grad()
-        mel_output, loss = model(batch_src_idx, encoder_mask, decoder_input, decoder_mask, batch_targets)
+        mel_output, loss = model(batch_src_idx, audio_mask, decoder_input, txt_mask, batch_targets)
         loss.backward()
         optimizer.step()
         torch.cuda.synchronize()

@@ -143,19 +143,13 @@ class MultiHeadAttention(nn.Module):
         # Apply final linear projection
         out = self.dropout(self.proj(attention_output))
         return out
-
-class CustomConvolution: #need to define and understand
-    def __init__(self):
-        self.heads = 1
-    def forward():
-        return
-
     
 class Transformer(nn.Module): 
     
     def __init__ (self, block_size, char_size, d_model, n_heads, dropout_rate, n_layers, n_mels):
         super().__init__()
-        self.cproj = nn.Linear(c, d_model)
+        self.xt_proj = nn.Linear(c, d_model)
+        self.cond_proj = nn.Linear(c, d_model)
         self.abs_pos_embed = nn.Embedding(max_seq_len, d_model)
         self.time_mlp = nn.Sequential(CustomConvolution(d_model), nn.Linear(d_model+1, d_model))
         self.dim_head = d_model // n_heads
@@ -173,14 +167,19 @@ class Transformer(nn.Module):
             
     def forward(
         self,
-        x: Float['b s c'],
+        xt: Float['b s c'],
+        cond,
         times: Float['b'],
-        text: Float['b s c']
+        text: Float['b s c'],
+        audio_mask,
+        txt_mask
     ): 
         b, s, _ = x.size()
-        x = self.cproj(x) # project mel spec into transformer's embedding space
+        xt = self.xt_proj(xt) # project mel spec into transformer's embedding space
+        cond = self.cond_proj(cond)
+        xt = xt + cond # add conditioned and interpolated audio inputs for infilling task
         seq = torch.arange(s, device = device) # create a tensor that will be passed through abs pos embedding layer
-        x = x + self.abs_pos_embed(seq) # add abs pos embed to input 
+        xt = xt + self.abs_pos_embed(seq) # add abs pos embed to input 
         norm_kwargs = {}
         times = self.time_mlp(times) # pass times through an MLP that takes it from b, -> b,d_model -> b,d_model 
         #need to understand this process much better
@@ -188,13 +187,13 @@ class Transformer(nn.Module):
 
         for layer_modules in self.layers:
             text_conv, speech_conv, text_attn, cross_condition, audio_attn = layer_modules
-            text = text_conv(text, mask = mask) + text
+            text = text_conv(text, mask = txt_mask) + text
             text_attn_output = text_attn(text)
             text = text_attn_output + text
-            x, text_embed = cross_condition(x, text_embed)
-            x = x + speech_conv(x, mask=mask)
-            audio_attn_output = audio_attn(x)
-            x = x + audio_attn_output
+            xt, text_embed = cross_condition(x, text_embed)
+            xt = xt + speech_conv(xt, mask=audio_mask)
+            audio_attn_output = audio_attn(xt)
+            xt = xt + audio_attn_output
 
         return mel_output, loss
 
