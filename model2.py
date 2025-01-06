@@ -2,79 +2,12 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torchtune.modules import RotaryPositionalEmbeddings
-import jaxtyping
-from einops.layers.torch import Rearrange
-from einops import rearrange, repeat, reduce, einsum, pack, unpack
-import einx
 from torch import Tensor
 from x_transformers.x_transformers import RotaryEmbedding
 from x_transformers import AdaptiveRMSNorm
-
-class TorchTyping:
-    def __init__(self, abstract_dtype):
-        self.abstract_dtype = abstract_dtype
-
-    def __getitem__(self, shapes: str):
-        return self.abstract_dtype[Tensor, shapes]
-
-Float = TorchTyping(jaxtyping.Float)
-Int   = TorchTyping(jaxtyping.Int)
-Bool  = TorchTyping(jaxtyping.Bool)
+import math
 
 
-class DepthwiseConv(nn.Module):
-    def __init__(
-        self,
-        dim, # number of input and output channels - since its depthwise, input=output
-        *,
-        kernel_size, # size of convolution kernel
-        groups = None # number of groups for convolution, defaults to dim meaning a full depthwise convolution where each input is convolved indep with its own filters
-    ):
-        super().__init__()
-        assert not divisible_by(kernel_size, 2)
-        groups = default(groups, dim) # full depthwise conv by default
-
-        self.dw_conv1d = nn.Sequential(
-            nn.Conv1d(dim, dim, kernel_size, groups = groups, padding = kernel_size // 2), #padding here kernl//2 means output tens has same length as input/same padding
-            nn.SiLU() #silu activation - sigmoid linear unit
-        )
-
-    def forward(
-        self,
-        x,
-        mask = None
-    ):
-        if exists(mask):
-            x = einx.where('b n, b n d, -> b n d', mask, x, 0.)
-        x = rearrange(x, 'b n c -> b c n') #rearranged to (batch_size, channels, sequence_length), which is the expected format for 1D convolution in PyTorch.
-        x = self.dw_conv1d(x)
-        out = rearrange(x, 'b c n -> b n c') #rearranged back
-        if exists(mask):
-            out = einx.where('b n, b n d, -> b n d', mask, out, 0.)
-        return out
-
-class TextAudioCrossCondition(nn.Module):
-    def __init__(
-        self,
-        dim,
-        dim_text,
-    ):
-        super().__init__()
-        self.text_to_audio = nn.Linear(dim_text + dim, dim, bias = False)
-        nn.init.zeros_(self.text_to_audio.weight)
-        self.cond_audio_to_text = cond_audio_to_text
-        self.audio_to_text = nn.Linear(dim + dim_text, dim_text, bias = False)
-        nn.init.zeros_(self.audio_to_text.weight)
-
-    def forward(
-        self,
-        audio: Float['b n d'],
-        text: Float['b n dt']
-    ):
-        audio_text, _ = pack((audio, text), 'b n *')
-        text_cond = self.text_to_audio(audio_text)
-        audio_cond = self.audio_to_text(audio_text)
-        return audio + text_cond, text + audio_cond
 
 class FeedForward(nn.Module):
     def __init__(self, d_model, dropout_rate):
@@ -123,7 +56,7 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, x, context=None, mask=None):    
         B, T, _ = x.size()
-        context = x if context is None else context
+        context = x if context is None else context # in case an encoder is added to future for cross attn
         S = context.shape[1]
         q = self.q_proj(x)  # (B, T, d_model)
         k = self.k_proj(context)  # (B, S, d_model)
@@ -146,66 +79,51 @@ class MultiHeadAttention(nn.Module):
     
 class Transformer(nn.Module): 
     
-    def __init__ (self, block_size, char_size, d_model, n_heads, dropout_rate, n_layers, n_mels):
+    def __init__ (self, char_size, d_model, n_heads, dropout_rate, n_layers, n_mels, device, max_timesteps):
         super().__init__()
-        self.xt_proj = nn.Linear(c, d_model)
-        self.cond_proj = nn.Linear(c, d_model)
-        self.abs_pos_embed = nn.Embedding(max_seq_len, d_model)
-        self.time_mlp = nn.Sequential(CustomConvolution(d_model), nn.Linear(d_model+1, d_model))
+        H = 256 #text embedding lookup dimension
+        max_period = 10000 #for sinusoidal embeddings
+        half = d_model//2
+        self.d_model = d_model
+        self.xt_proj = nn.Linear(n_mels, d_model)
+        self.cond_proj = nn.Linear(2*n_mels+H, d_model) #2C+H
+        self.text_embedding_table = nn.Embedding(char_size, H) # H is 256
+        self.abs_pos_embed = nn.Embedding(max_timesteps, d_model)
         self.dim_head = d_model // n_heads
-
+        self.register_buffer(
+            "freqs",
+            torch.exp(
+                -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
+            )
+        )
         self.n_layers = n_layers
-        self.layers = nn.ModuleList([
-            nn.ModuleList([
-                DepthwiseConv(dim, kernel_size=kernel_size),   
-                DepthwiseConv(dim, kernel_size=kernel_size),
-                Decoder(d_model, n_heads, dropout_rate),
-                TextAudioCrossCondition(),
-                Decoder()
-            ]) for _ in range(n_layers)
-        ])
+
             
     def forward(
         self,
-        xt: Float['b s c'],
-        cond,
-        times: Float['b'],
-        text: Float['b s c'],
+        xt, #: Float['b s c'] noisy speech
+        cond, #x_ctx masked speech
+        times, #: Float['b'],
+        text, #: Float['b s c'],
         audio_mask,
-        txt_mask
+        txt_mask,
+        device
     ): 
-        b, s, _ = x.size()
-        xt = self.xt_proj(xt) # project mel spec into transformer's embedding space
-        cond = self.cond_proj(cond)
-        xt = xt + cond # add conditioned and interpolated audio inputs for infilling task
-        seq = torch.arange(s, device = device) # create a tensor that will be passed through abs pos embedding layer
-        xt = xt + self.abs_pos_embed(seq) # add abs pos embed to input 
-        norm_kwargs = {}
-        times = self.time_mlp(times) # pass times through an MLP that takes it from b, -> b,d_model -> b,d_model 
-        #need to understand this process much better
-        norm_kwargs.update(condition = times) #update kwargs for rand mean square normalization
-
-        for layer_modules in self.layers:
-            text_conv, speech_conv, text_attn, cross_condition, audio_attn = layer_modules
-            text = text_conv(text, mask = txt_mask) + text
-            text_attn_output = text_attn(text)
-            text = text_attn_output + text
-            xt, text_embed = cross_condition(x, text_embed)
-            xt = xt + speech_conv(xt, mask=audio_mask)
-            audio_attn_output = audio_attn(xt)
-            xt = xt + audio_attn_output
-
-        return mel_output, loss
+        text = self.text_embedding_table(text) # B, S -> B, S, H embed dimension
+        assert text.size(1) == xt.size(1) == cond.size(1)
+        #xt = self.xt_proj(xt) # project mel spec into transformer's embedding space
+        #cond = self.cond_proj(cond)
+        #xt = xt + cond # add conditioned and interpolated audio inputs for infilling task
+        Hc = torch.cat([xt, cond, text], dim=2) #Resulting shape is B,S,(2C+H)
+        Hc = self.xt_proj(Hc) # B, S, D_model
+        #seq = torch.arange(s, device = device) # create a tensor that will be passed through abs pos embedding layer
+        #pos_embed = self.abs_pos_embed(seq)
+        #Hc = Hc + self.abs_pos_embed(pos_embed) # add abs pos embed to input 
+        args = times[:, None].float() * self.freqs[None]
+        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+        if self.d_model % 2:
+            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
 
 
 
-
-
-
-    
-
-        
-
-
-
-
+        return xt

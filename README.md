@@ -1,18 +1,21 @@
-# RBTTS - an implementation of E2TTS (https://arxiv.org/abs/2406.18009)
+# RBTTS - an implementation of Voicebox (https://arxiv.org/abs/2306.15687) and E2TTS (https://arxiv.org/abs/2406.18009)
 
-Embarking on my second project, albeit one that could prove to be too challenging, as it delves into uncharted territory for me and demands skills I’m still mastering. My goal is to produce a natural-sounding, Text-To-Speech model using the Transformer architecture. Learning by coding directly (compared to online courses) has accelerated my knowledge base, however, so at the minimum I expect to gain a lot of insight into Transformers, in general.
 
 # Model Architecture - Update to Conditional Flow-Based Model
 
-After completing the creation of an encoder-decoder transformer, I will be implementing a flow-matching mel-spec generator.
+Upon completing the development of an encoder-decoder transformer, I will focus on designing a non-autoregressive (NAR) mel-spectrogram generator. This system will integrate conditional flow-matching and optimal transport methodologies, utilizing a GPT-inspired decoder-only transformer architecture to estimate a time-dependent vector field.
 
-### Earlier iteration of the project
-This a classic transformer with encoder-decoder components and cross-attention. The encoder takes in input text, while the decoder takes in mel spectrograms, which represent the audio. The model will be trained with [teacher forcing](#teacher-forcing) with scheduled sampling. The input text will be broken into [phonemes](#phonemes) using the G2P library. This will be compared with E2 TTS flow-sampling for optimal results.
+The readability of this README will lag behind the code, unfortuantely, as the coding is much more interesting. Once I produce samples, I will ensure the README reflects all steps.
 
 # Under Active Development
 
 ## Just completed: adding "FILL" tokens to text input so that they align with audio input according to E2TTS (https://arxiv.org/abs/2406.18009)
-## Next step: come up with methodology to combine text and audio as per E2TTS
+## Just completed: Next step: come up with methodology to combine text and audio as per E2TTS
+## Next step: add time to audio-text input before input into transformer
+
+# To do list:
+-complete pre-processing by evaluating samples, and determining mean and std in order to standardize the input data 
+-need to implement mini-batches to align with Voicebox/E2TTS
 
 # Steps
 
