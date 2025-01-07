@@ -8,14 +8,14 @@ Upon completing the development of an encoder-decoder transformer, I will focus 
 The readability of this README will lag behind the code, unfortuantely, as the coding is much more interesting. Once I produce samples, I will ensure the README reflects all steps.
 
 # Under Active Development
-
-## Just completed: adding "FILL" tokens to text input so that they align with audio input according to E2TTS (https://arxiv.org/abs/2406.18009)
-## Just completed: Next step: come up with methodology to combine text and audio as per E2TTS
-## Next step: add time to audio-text input before input into transformer
+### Completed: add time to audio-text input before input into transformer and added UNet style skip-connections
+-Up next: create inference pass using midpoint solver as in Voicebox
+-Up next: complete loss calculation incorporating masking
 
 # To do list:
--complete pre-processing by evaluating samples, and determining mean and std in order to standardize the input data 
--need to implement mini-batches to align with Voicebox/E2TTS
+1) complete pre-processing by evaluating samples, and determining mean and std in order to standardize the input data 
+2) need to implement mini-batches to align with Voicebox/E2TTS
+3) I currently employ RoPe - may substitute for AliBi as per Voicebox after initial training runs
 
 # Steps
 
