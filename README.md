@@ -9,13 +9,14 @@ The readability of this README will lag behind the code, unfortuantely, as the c
 
 # Under Active Development
 ### Completed: add time to audio-text input before input into transformer and added UNet style skip-connections
--Up next: create inference pass using midpoint solver as in Voicebox
--Up next: complete loss calculation incorporating masking
+### completed:  create inference pass using midpoint solver as in Voicebox
+### completed: added attn_mask handling, loss function
+
 
 # To do list:
 1) complete pre-processing by evaluating samples, and determining mean and std in order to standardize the input data 
-2) need to implement mini-batches to align with Voicebox/E2TTS
-3) I currently employ RoPe - may substitute for AliBi as per Voicebox after initial training runs
+2) add weight clipping
+3) ensure loss function is correct for mini batches
 
 # Steps
 
@@ -118,17 +119,11 @@ Train a reflowed model
 
 # Challenges and Considerations
 
-1) The model is not explicitly told the duration of each character pronounced, which can affect the speed of the voice at the end
-2) The model is not explicitly told the phonetic pronounciations of words - the model will need to learn the associations itself
-3) The use of absolute vs relative positional encodings to handle speech generation that is longer than the training data
-4) Deciding whether or not to normalize mel specs (currently keeping it between -80 and 0 DB)
-5) Deciding whether to add EOD token for mel spec decoder
-6) Adjust Rope parameters
+1) Voicebox used ALiBi; in my current implementation, I will be using RoPE
 
 # Final debugging steps
 
 1) Ensure only one voice by reviewing audio and removing unique voice samples
-2) ensure text has same length (S) as audio targets; ensure special fillers added correctly to achieve this
 3) Standardize mel specs by first determining training set mean and standard deviation and then applying it
 
 # Things to study up on:
@@ -144,3 +139,12 @@ https://diffusionflow.github.io/
 https://implicit-layers-tutorial.org/?utm_source=chatgpt.com
 
 https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/DL2/Dynamical_systems/dynamical_systems_neural_odes.html?utm_source=chatgpt.com
+
+
+Hop length
+Hop Length: 256 samples →
+Frame Shift=25622,050≈11.6 ms/frame.
+Frame Shift=22,050256​≈11.6ms/frame.
+producing 86 frames per second
+
+The models were trained for 800,000 mini-batch updates, meaning the optimizer updated the model's parameters 800,000 times during training. each mini-batch contains 307,200 audio frames.
