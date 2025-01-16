@@ -1,10 +1,10 @@
 {
     "audio_params": {
-        "sr": 22050,
-        "n_fft": 1024,
-        "hop_length": 512,
-        "n_mels": 128,
-        "max_ts" : 302
+        "sr": 24000,
+        "n_fft": 512,
+        "hop_length": 256,
+        "n_mels": 100,
+        "max_timesteps" : 556
     },
 
     "data_paths": {
@@ -14,7 +14,11 @@
         "processed_audio": "./data/processed_audio/",
         "mel_specs": "./data/mel_specs/",
         "training_samples": "./Data/Training_Samples",
-        "training_data": "./Data/TrainingData"
+        "training_data": "./Data/TrainingData",
+        "training_mels": "./Data/Training_Mels",
+        "training_text": "./Data/Training_Text"
+
+
     },
 
     "train_params": {
