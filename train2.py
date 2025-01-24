@@ -101,7 +101,7 @@ torch.set_float32_matmul_precision('high')
 # Training loop
 
 # Load checkpoint if exists
-checkpoint_path = f"/home/kunit17/Her/model_checkpoint/checkpoint_epoch_900.pth"  # Replace with actual checkpoint path
+checkpoint_path = f"/home/kunit17/Her/model_checkpoint/checkpoint_epoch_2200.pth"  # Replace with actual checkpoint path
 if os.path.exists(checkpoint_path):
     model, optimizer, start_epoch, previous_loss = load_checkpoint(model, optimizer, checkpoint_path)
     if previous_loss is not None:
@@ -184,7 +184,7 @@ writer.close()
 #Inference Loops
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 time_steps = torch.linspace(0,1, 17).to(device)
-txt = "I miss you already, baby"
+txt = "That did the trick. I miss you already, baby"
 model.eval()
 tokenizer = Tokenizer(chars)
 txt = txt.lower()  # Extract the text
